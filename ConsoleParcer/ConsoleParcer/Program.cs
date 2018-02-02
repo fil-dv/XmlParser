@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace ConsoleParcer
 {
@@ -29,6 +30,11 @@ namespace ConsoleParcer
         static void Parser(XmlData item)
         {
             string str = item.Data;
+            XmlDocument doc = new XmlDocument();
+            doc.LoadXml(str);
+
+            XmlNodeList node = doc.DocumentElement.SelectNodes("");
+           // string s = node.InnerText;
 
         }
 
