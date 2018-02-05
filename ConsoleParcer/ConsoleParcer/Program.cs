@@ -29,7 +29,10 @@ namespace ConsoleParcer
 
         static void Parser(XmlData item, OracleConnect con)
         {
-
+            if (item.Data == null || item.Data.Length < 12)
+            {
+                return;
+            }
             string str = item.Data;
             XmlDocument doc = new XmlDocument();
             doc.LoadXml(str);
@@ -73,40 +76,47 @@ namespace ConsoleParcer
                     }
                 }                
             }
-            Console.ReadLine();
         }
 
         private static void InsertToDB(OracleConnect con, Record rec)
         {
-
-            string query = "";
-            //con.ExecCommand(query);
-
+            try
+            {
+                string query = "INSERT INTO XML_DATA (ID, PROJECT_ID, ID_IN_XML, BLOCK_NAME, BLOCK_VARIABLE_NAME, ITEM_NAME, ITEM_VARIABLE_NAME,ITEM_VALUE)" +
+                                         " VALUES(XML_SEQUENCE.NEXTVAL, " +
+                                                rec.ProjectID + ", " +
+                                                rec.IdInXml + ", '" +
+                                                rec.BlockName + "', '" +
+                                                rec.BlockVariableName + "', '" +
+                                                rec.ItemName + "', '" +
+                                                rec.ItemVariableName + "', '" +
+                                                rec.ItemValue + "')";
+                con.ExecCommand(query);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);                
+            }
         }
 
         static void ReadDataToList(OracleConnect con/*, ref List<XmlData> dataList*/)
         {
             string query = "select t.id, t.project_id, t.data from SUVD.PROJECT_XML t";
             OracleDataReader reader = con.GetReader(query);
-           // Console.WriteLine("Старт. " + DateTime.Now);
+            Console.WriteLine("Старт. " + DateTime.Now);
             int limit = 0;
-            while (reader.Read() && limit < 1)
+            while (reader.Read())
             {
-                limit++;
-          //      if (limit < 1500000) continue;
+                limit++;        
                 XmlData xmlData = new XmlData();
                 xmlData.Id = Convert.ToDecimal(reader[0].ToString());
                 xmlData.ProjectId = Convert.ToDecimal(reader[1].ToString());
                 xmlData.Data = reader[2].ToString();
-
-                Parser(xmlData, con);
-
-                //dataList.Add(xmlData);                
-                //Console.WriteLine(limit.ToString());
+                Parser(xmlData, con);                            
+                Console.WriteLine(limit.ToString());
             }
             reader.Close();
-            //Console.WriteLine("Готово. Прочитано " + dataList.Count + " записей.");
-            //Console.WriteLine(DateTime.Now);
+            Console.WriteLine("Стоп. " + DateTime.Now);
         }
 
         /// <summary>
