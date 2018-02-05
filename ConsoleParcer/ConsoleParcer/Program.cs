@@ -27,14 +27,60 @@ namespace ConsoleParcer
 
         }
 
-        static void Parser(XmlData item)
+        static void Parser(XmlData item, OracleConnect con)
         {
+
             string str = item.Data;
             XmlDocument doc = new XmlDocument();
             doc.LoadXml(str);
 
-            XmlNodeList node = doc.DocumentElement.SelectNodes("");
-           // string s = node.InnerText;
+            List<string> list = new List<string>();
+
+            XmlNodeList outNodes = doc.DocumentElement.ChildNodes;
+            foreach (XmlNode node in outNodes)
+            {
+                string outNodeName = "";
+                string outNodeAttr = "";
+                XmlAttributeCollection attrsOut = node.Attributes;
+                foreach (XmlAttribute attOut in attrsOut)
+                {
+                    list.Add(node.Name);
+                    outNodeName = node.Name;
+                    list.Add(attOut.Value);
+                    outNodeAttr = attOut.Value;
+                }
+                XmlNodeList inNodes = node.ChildNodes;
+                foreach (XmlNode nodeIn in inNodes)
+                {
+                    XmlAttributeCollection attrsIn = nodeIn.Attributes;
+                    foreach (XmlAttribute attIn in attrsIn)
+                    {
+                        list.Add(nodeIn.Name);
+                        list.Add(attIn.Value);
+                        list.Add(nodeIn.InnerText);
+
+                        Record rec = new Record
+                        {
+                            ProjectID = item.ProjectId,
+                            IdInXml = item.Id,
+                            BlockName = outNodeAttr,
+                            BlockVariableName = outNodeName,
+                            ItemName = attIn.Value,
+                            ItemVariableName = nodeIn.Name,
+                            ItemValue = nodeIn.InnerText
+                        };
+                        InsertToDB(con, rec);
+                    }
+                }                
+            }
+            Console.ReadLine();
+        }
+
+        private static void InsertToDB(OracleConnect con, Record rec)
+        {
+
+            string query = "";
+            //con.ExecCommand(query);
 
         }
 
@@ -53,7 +99,7 @@ namespace ConsoleParcer
                 xmlData.ProjectId = Convert.ToDecimal(reader[1].ToString());
                 xmlData.Data = reader[2].ToString();
 
-                Parser(xmlData);
+                Parser(xmlData, con);
 
                 //dataList.Add(xmlData);                
                 //Console.WriteLine(limit.ToString());
