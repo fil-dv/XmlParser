@@ -1,10 +1,12 @@
 ﻿using DbLayer;
 using Oracle.ManagedDataAccess.Client;
+using Semaphore.Infrastructure.WorkWithFiles;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -14,75 +16,131 @@ namespace ConsoleParcer
     {        
         static void Main(string[] args)
         {
-            OracleConnect con = new OracleConnect("User ID=import_user;password=sT7hk9Lm;Data Source=CD_WORK");
+            OracleConnect con = new OracleConnect("User ID=import_user;password=sT7hk9Lm;Data Source=CD_TEST");
             con.OpenConnect();
-
-            //       for write to file       //
-            //List<XmlData> dataList = new List<XmlData>();
-            ReadDataToList(con/*, ref dataList*/);
-            //WriteToBinaryFile("XML_test.bin", dataList);
-
-            //       for read from file       //
-            //  List<XmlData> dataList = ReadFromBinaryFile<List<XmlData>>("XML_test.bin");
-
+            ReadDataToList(con);
         }
 
-        static void Parser(XmlData item, OracleConnect con)
-        {
-            if (item.Data == null || item.Data.Length < 12)
-            {
-                return;
-            }
-            string str = item.Data;
-            XmlDocument doc = new XmlDocument();
-            doc.LoadXml(str);
-
-            List<string> list = new List<string>();
-
-            XmlNodeList outNodes = doc.DocumentElement.ChildNodes;
-            foreach (XmlNode node in outNodes)
-            {
-                string outNodeName = "";
-                string outNodeAttr = "";
-                XmlAttributeCollection attrsOut = node.Attributes;
-                foreach (XmlAttribute attOut in attrsOut)
-                {
-                    list.Add(node.Name);
-                    outNodeName = node.Name;
-                    list.Add(attOut.Value);
-                    outNodeAttr = attOut.Value;
-                }
-                XmlNodeList inNodes = node.ChildNodes;
-                foreach (XmlNode nodeIn in inNodes)
-                {
-                    XmlAttributeCollection attrsIn = nodeIn.Attributes;
-                    foreach (XmlAttribute attIn in attrsIn)
-                    {
-                        list.Add(nodeIn.Name);
-                        list.Add(attIn.Value);
-                        list.Add(nodeIn.InnerText);
-
-                        Record rec = new Record
-                        {
-                            ProjectID = item.ProjectId,
-                            IdInXml = item.Id,
-                            BlockName = outNodeAttr,
-                            BlockVariableName = outNodeName,
-                            ItemName = attIn.Value,
-                            ItemVariableName = nodeIn.Name,
-                            ItemValue = nodeIn.InnerText
-                        };
-                        InsertToDB(con, rec);
-                    }
-                }                
-            }
-        }
-
-        private static void InsertToDB(OracleConnect con, Record rec)
+        static void ReadDataToList(OracleConnect con)
         {
             try
             {
-                string query = "INSERT INTO XML_DATA (ID, PROJECT_ID, ID_IN_XML, BLOCK_NAME, BLOCK_VARIABLE_NAME, ITEM_NAME, ITEM_VARIABLE_NAME,ITEM_VALUE)" +
+                string query = "select x.id, x.project_id, x.data " +
+                             "from SUVD.PROJECTS t, suvd.creditor_dogovors d, suvd.project_xml x " +
+                            "where d.id = t.dogovor_id " +
+                              "and nvl(d.stop_date, sysdate) >= sysdate " +
+                              "and x.project_id = t.id " +
+                              "and x.data is not null";
+                OracleDataReader reader = con.GetReader(query);
+                DateTime startDate = DateTime.Now;
+                DateTime lastDate = DateTime.Now;
+                Console.WriteLine("Старт. " + startDate);
+                int count = 0;
+                while (reader.Read()/* && count < 120000*/)
+                {
+                    count++;
+                    if (count < 124251) continue; 
+                    XmlData xmlData = new XmlData();
+                    xmlData.Id = Convert.ToDecimal(reader[0].ToString());
+                    xmlData.ProjectId = Convert.ToDecimal(reader[1].ToString());
+                    xmlData.Data = reader[2].ToString();
+                    Parser(xmlData, con, count);
+                    if (count % 25000 == 0)
+                    {
+                        double tmp = (DateTime.Now - lastDate).TotalMinutes;
+                        Console.WriteLine(count.ToString() + " за " + tmp.ToString() + " минут");
+                        lastDate = DateTime.Now;
+                        Console.WriteLine();
+                    }
+                    //Console.WriteLine(count.ToString());
+                    FileHandler.WriteToFile(count.ToString());
+                }
+                reader.Close();
+                DateTime endDate = DateTime.Now;
+                double dif = (endDate - startDate).TotalMinutes;
+                Console.WriteLine("Закончено за " + dif + " минут.");
+                Console.ReadLine();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.TargetSite + "\n" + ex.Message);
+                FileHandler.WriteToFile(ex.TargetSite + "\n" + ex.Message);
+            }            
+        }
+
+        static void Parser(XmlData item, OracleConnect con, int count)
+        {
+            try
+            {
+                if (item.Data == null || item.Data.Length < 12)
+                {
+                    return;
+                }
+                string str = item.Data.Trim();
+                if (!str.Contains("</xml>"))
+                {
+                    str = str + (Environment.NewLine + "</xml>");
+                }
+                XmlDocument doc = new XmlDocument();
+                doc.LoadXml(str);
+
+                List<string> list = new List<string>();
+
+                XmlNodeList outNodes = doc.DocumentElement.ChildNodes;
+                foreach (XmlNode node in outNodes)
+                {
+                    string outNodeName = "";
+                    string outNodeAttr = "";
+                    XmlAttributeCollection attrsOut = node.Attributes;
+                    foreach (XmlAttribute attOut in attrsOut)
+                    {
+                        list.Add(node.Name);
+                        outNodeName = node.Name;
+                        list.Add(attOut.Value);
+                        outNodeAttr = attOut.Value;
+                    }
+                    XmlNodeList inNodes = node.ChildNodes;
+                    foreach (XmlNode nodeIn in inNodes)
+                    {
+                        XmlAttributeCollection attrsIn = nodeIn.Attributes;
+                        foreach (XmlAttribute attIn in attrsIn)
+                        {
+                            list.Add(nodeIn.Name);
+                            list.Add(attIn.Value);
+                            list.Add(nodeIn.InnerText);
+
+                            Record rec = new Record
+                            {
+                                ProjectID = item.ProjectId,
+                                IdInXml = item.Id,
+                                BlockName = outNodeAttr,
+                                BlockVariableName = outNodeName,
+                                ItemName = attIn.Value,
+                                ItemVariableName = nodeIn.Name,
+                                ItemValue = nodeIn.InnerText
+                            };
+                            rec.BlockName = rec.BlockName.Replace("'", "`");
+                            rec.BlockVariableName = rec.BlockVariableName.Replace("'", "`");
+                            rec.ItemName = rec.ItemName.Replace("'", "`");
+                            rec.ItemVariableName = rec.ItemVariableName.Replace("'", "`");
+                            rec.ItemValue = rec.ItemValue.Replace("'", "`");
+                            InsertToDB(con, rec, count);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.TargetSite + "\n" + ex.Message);
+                FileHandler.WriteToFile(ex.TargetSite + "\n" + ex.Message);
+            }            
+        }
+
+        private static void InsertToDB(OracleConnect con, Record rec, int count)
+        {
+            try
+            {
+                string query = "INSERT INTO XML_DATA (ID, PROJECT_ID, ID_IN_XML, BLOCK_TITLE, BLOCK_NAME, ITEM_TITLE, ITEM_NAME,ITEM_VALUE)" +
                                          " VALUES(XML_SEQUENCE.NEXTVAL, " +
                                                 rec.ProjectID + ", " +
                                                 rec.IdInXml + ", '" +
@@ -95,29 +153,12 @@ namespace ConsoleParcer
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);                
+                Console.WriteLine(ex.TargetSite + "\n" + ex.Message);
+                FileHandler.WriteToFile(ex.TargetSite + "\n" + ex.Message);
             }
         }
 
-        static void ReadDataToList(OracleConnect con/*, ref List<XmlData> dataList*/)
-        {
-            string query = "select t.id, t.project_id, t.data from SUVD.PROJECT_XML t";
-            OracleDataReader reader = con.GetReader(query);
-            Console.WriteLine("Старт. " + DateTime.Now);
-            int limit = 0;
-            while (reader.Read())
-            {
-                limit++;        
-                XmlData xmlData = new XmlData();
-                xmlData.Id = Convert.ToDecimal(reader[0].ToString());
-                xmlData.ProjectId = Convert.ToDecimal(reader[1].ToString());
-                xmlData.Data = reader[2].ToString();
-                Parser(xmlData, con);                            
-                Console.WriteLine(limit.ToString());
-            }
-            reader.Close();
-            Console.WriteLine("Стоп. " + DateTime.Now);
-        }
+
 
         /// <summary>
         /// Writes the given object instance to a binary file.

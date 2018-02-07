@@ -47,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FileHandler.cs" />
     <Compile Include="Record.cs" />
     <Compile Include="XmlData.cs" />
     <Compile Include="Program.cs" />
