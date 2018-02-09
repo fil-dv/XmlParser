@@ -16,7 +16,7 @@ namespace ConsoleParcer
     {        
         static void Main(string[] args)
         {
-            OracleConnect con = new OracleConnect("User ID=import_user;password=sT7hk9Lm;Data Source=CD_TEST");
+            OracleConnect con = new OracleConnect("User ID=import_user;password=sT7hk9Lm;Data Source=CD_WORK");
             con.OpenConnect();
             ReadDataToList(con);
         }
@@ -26,20 +26,22 @@ namespace ConsoleParcer
             try
             {
                 string query = "select x.id, x.project_id, x.data " +
-                             "from SUVD.PROJECTS t, suvd.creditor_dogovors d, suvd.project_xml x " +
-                            "where d.id = t.dogovor_id " +
-                              "and nvl(d.stop_date, sysdate) >= sysdate " +
-                              "and x.project_id = t.id " +
-                              "and x.data is not null";
+                                 "from SUVD.PROJECTS t, suvd.creditor_dogovors d, suvd.project_xml x " +
+                                "where d.id = t.dogovor_id " +
+                                  "and t.archive_flag = 0" +
+                                  "and nvl(d.stop_date, sysdate) >= sysdate " +
+                                  "and x.project_id = t.id " +
+                                  "and x.data is not null";
                 OracleDataReader reader = con.GetReader(query);
                 DateTime startDate = DateTime.Now;
                 DateTime lastDate = DateTime.Now;
                 Console.WriteLine("Старт. " + startDate);
                 int count = 0;
-                while (reader.Read()/* && count < 120000*/)
+                int bitStart = 0;
+                while (reader.Read() && count < 10)
                 {
                     count++;
-                    if (count < 124251) continue; 
+                    //if (count < 77888) continue; 
                     XmlData xmlData = new XmlData();
                     xmlData.Id = Convert.ToDecimal(reader[0].ToString());
                     xmlData.ProjectId = Convert.ToDecimal(reader[1].ToString());
@@ -48,7 +50,8 @@ namespace ConsoleParcer
                     if (count % 25000 == 0)
                     {
                         double tmp = (DateTime.Now - lastDate).TotalMinutes;
-                        Console.WriteLine(count.ToString() + " за " + tmp.ToString() + " минут");
+                        Console.WriteLine("c " + bitStart.ToString() + " по " + count.ToString() + " залилось за " + tmp.ToString() + " минут.");
+                        bitStart = count;
                         lastDate = DateTime.Now;
                         Console.WriteLine();
                     }
@@ -58,7 +61,7 @@ namespace ConsoleParcer
                 reader.Close();
                 DateTime endDate = DateTime.Now;
                 double dif = (endDate - startDate).TotalMinutes;
-                Console.WriteLine("Закончено за " + dif + " минут.");
+                Console.WriteLine("Закончено за " + dif + " минут." + Environment.NewLine + "Распарсено  " + count + " записей.");
                 Console.ReadLine();
             }
             catch (Exception ex)
@@ -140,7 +143,7 @@ namespace ConsoleParcer
         {
             try
             {
-                string query = "INSERT INTO XML_DATA (ID, PROJECT_ID, ID_IN_XML, BLOCK_TITLE, BLOCK_NAME, ITEM_TITLE, ITEM_NAME,ITEM_VALUE)" +
+                string query = "INSERT INTO SUVD.XML_DATA (ID, PROJECT_ID, ID_IN_XML, BLOCK_TITLE, BLOCK_NAME, ITEM_TITLE, ITEM_NAME,ITEM_VALUE)" +
                                          " VALUES(XML_SEQUENCE.NEXTVAL, " +
                                                 rec.ProjectID + ", " +
                                                 rec.IdInXml + ", '" +
