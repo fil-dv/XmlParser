@@ -15,5 +15,6 @@ namespace ConsoleParcer
         public string ItemName { get; set; }
         public string ItemVariableName { get; set; }
         public string ItemValue { get; set; }
+        public decimal Num { get; set; }
     }
 }

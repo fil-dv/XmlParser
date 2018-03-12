@@ -33,12 +33,13 @@ namespace ConsoleParcer
                                   "and x.project_id = t.id " +
                                   "and x.data is not null";
                 OracleDataReader reader = con.GetReader(query);
+
                 DateTime startDate = DateTime.Now;
                 DateTime lastDate = DateTime.Now;
                 Console.WriteLine("Старт. " + startDate);
                 int count = 0;
                 int bitStart = 0;
-                while (reader.Read() && count < 10)
+                while (reader.Read() && count < 100)
                 {
                     count++;
                     //if (count < 77888) continue; 
@@ -88,15 +89,17 @@ namespace ConsoleParcer
                 doc.LoadXml(str);
 
                 List<string> list = new List<string>();
-
+               
                 XmlNodeList outNodes = doc.DocumentElement.ChildNodes;
                 foreach (XmlNode node in outNodes)
                 {
+                    int num = 0;
                     string outNodeName = "";
                     string outNodeAttr = "";
                     XmlAttributeCollection attrsOut = node.Attributes;
+                    
                     foreach (XmlAttribute attOut in attrsOut)
-                    {
+                    {                        
                         list.Add(node.Name);
                         outNodeName = node.Name;
                         list.Add(attOut.Value);
@@ -105,13 +108,14 @@ namespace ConsoleParcer
                     XmlNodeList inNodes = node.ChildNodes;
                     foreach (XmlNode nodeIn in inNodes)
                     {
+                        
                         XmlAttributeCollection attrsIn = nodeIn.Attributes;
                         foreach (XmlAttribute attIn in attrsIn)
                         {
+                            num++;
                             list.Add(nodeIn.Name);
                             list.Add(attIn.Value);
                             list.Add(nodeIn.InnerText);
-
                             Record rec = new Record
                             {
                                 ProjectID = item.ProjectId,
@@ -120,7 +124,8 @@ namespace ConsoleParcer
                                 BlockVariableName = outNodeName,
                                 ItemName = attIn.Value,
                                 ItemVariableName = nodeIn.Name,
-                                ItemValue = nodeIn.InnerText
+                                ItemValue = nodeIn.InnerText,
+                                Num = num
                             };
                             rec.BlockName = rec.BlockName.Replace("'", "`");
                             rec.BlockVariableName = rec.BlockVariableName.Replace("'", "`");
@@ -143,7 +148,7 @@ namespace ConsoleParcer
         {
             try
             {
-                string query = "INSERT INTO SUVD.XML_DATA (ID, PROJECT_ID, ID_IN_XML, BLOCK_TITLE, BLOCK_NAME, ITEM_TITLE, ITEM_NAME,ITEM_VALUE)" +
+                string query = "INSERT INTO SUVD.XML_DATA (ID, PROJECT_ID, ID_IN_XML, BLOCK_TITLE, BLOCK_NAME, ITEM_TITLE, ITEM_NAME, ITEM_VALUE, NUM)" +
                                          " VALUES(XML_SEQUENCE.NEXTVAL, " +
                                                 rec.ProjectID + ", " +
                                                 rec.IdInXml + ", '" +
@@ -151,7 +156,8 @@ namespace ConsoleParcer
                                                 rec.BlockVariableName + "', '" +
                                                 rec.ItemName + "', '" +
                                                 rec.ItemVariableName + "', '" +
-                                                rec.ItemValue + "')";
+                                                rec.ItemValue + "', '" +
+                                                rec.Num + "')";
                 con.ExecCommand(query);
             }
             catch (Exception ex)
